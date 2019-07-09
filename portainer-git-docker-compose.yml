@@ -1,0 +1,71 @@
+version: "2"
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    restart: always
+    container_name: nginx-proxy
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - conf:/etc/nginx/conf.d
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    network_mode: bridge
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: always
+    container_name: nginx-proxy-le
+    volumes_from:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    network_mode: bridge
+
+  portainer:
+    image: portainer/portainer
+    restart: always
+    container_name: portainer
+    environment:
+      - VIRTUAL_HOST=portainer.camcann.com
+      - VIRTUAL_PORT=9000
+      - LETSENCRYPT_HOST=portainer.camcann.com
+      - LETSENCRYPT_EMAIL=amolele@gmail.com
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    network_mode: bridge
+
+  gitlab:
+    image: 'gitlab/gitlab-ce:latest'
+    restart: always
+    container_name: gitlab
+    hostname: 'git.camcann.com'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://git.camcann.com'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {"X-Forwarded-Proto" => "https","X-Forwarded-Ssl" => "on"}
+      VIRTUAL_HOST: git.camcann.com
+      LETSENCRYPT_HOST: git.camcann.com
+      LETSENCRYPT_EMAIL: amolele@gmail.com
+
+    ports:
+      - '22:22'
+    volumes:
+      - '/srv/gitlab/config:/etc/gitlab'
+      - '/srv/gitlab/logs:/var/log/gitlab'
+      - '/srv/gitlab/data:/var/opt/gitlab'
+    network_mode: bridge
+
+volumes:
+  portainer_data:
+  conf:
+  vhost:
+  html:
+  certs:
